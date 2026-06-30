@@ -51,7 +51,7 @@ def extract_texts(item: dict):
         for turn in item["conversation"]:
             if isinstance(turn, dict):
                 texts.append(turn.get("content", ""))
-    for key in ("question", "answer", "input", "output", "text"):
+    for key in ("instruction", "question", "answer", "input", "output", "text"):
         if key in item:
             texts.append(str(item[key]))
     return texts
