@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechCorp Financial Assistant</title>
+<style>
+  :root{
+    --ink:#10151c;
+    --paper:#f6f4ee;
+    --ledger:#1c2b3a;
+    --ledger-light:#2e4459;
+    --accent:#c7762f;
+    --line:#d8d2c4;
+    --mono: 'Courier New', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family: Georgia, 'Times New Roman', serif;
+    background:var(--paper);
+    color:var(--ink);
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+  header{
+    background:var(--ledger);
+    color:var(--paper);
+    padding:18px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:3px solid var(--accent);
+  }
+  header h1{
+    font-size:1.15rem;
+    letter-spacing:0.04em;
+    font-weight:600;
+  }
+  header h1 small{
+    display:block;
+    font-family:var(--mono);
+    font-size:0.65rem;
+    color:#9fb0c0;
+    letter-spacing:0.12em;
+    margin-top:3px;
+  }
+  #status{
+    font-family:var(--mono);
+    font-size:0.7rem;
+    padding:4px 10px;
+    border:1px solid #46607a;
+    border-radius:3px;
+    color:#9fb0c0;
+  }
+  #status.ok{color:#7fd99b; border-color:#2f5e3f;}
+  #status.err{color:#e08a8a; border-color:#6a3030;}
+
+  main{
+    flex:1;
+    overflow-y:auto;
+    padding:28px;
+    max-width:760px;
+    width:100%;
+    margin:0 auto;
+  }
+  .msg{
+    margin-bottom:22px;
+    display:flex;
+    gap:14px;
+  }
+  .msg .tag{
+    font-family:var(--mono);
+    font-size:0.65rem;
+    letter-spacing:0.08em;
+    color:#8a8270;
+    width:64px;
+    flex-shrink:0;
+    padding-top:4px;
+    text-transform:uppercase;
+  }
+  .msg.user .tag{color:var(--accent);}
+  .msg .bubble{
+    line-height:1.55;
+    font-size:0.97rem;
+  }
+  .msg.bot .bubble{white-space:pre-wrap;}
+  .msg.user .bubble{font-style:italic;}
+
+  footer{
+    border-top:1px solid var(--line);
+    padding:18px 28px;
+    background:#efece2;
+  }
+  #form{
+    max-width:760px;
+    margin:0 auto;
+    display:flex;
+    gap:10px;
+  }
+  #input{
+    flex:1;
+    font-family:Georgia, serif;
+    font-size:0.97rem;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    background:#fff;
+  }
+  #input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  button{
+    font-family:var(--mono);
+    font-size:0.75rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    background:var(--ledger);
+    color:var(--paper);
+    border:none;
+    padding:0 22px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  button:hover{background:var(--ledger-light);}
+  button:disabled{background:#999; cursor:not-allowed;}
+
+  #settings{
+    max-width:760px;
+    margin:8px auto 0;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    font-family:var(--mono);
+    font-size:0.68rem;
+    color:#6b6450;
+  }
+  #settings input{
+    font-family:var(--mono);
+    font-size:0.68rem;
+    padding:4px 6px;
+    border:1px solid var(--line);
+    width:220px;
+  }
+  .typing{font-family:var(--mono); font-size:0.8rem; color:#8a8270;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TechCorp Financial Assistant<small>Phi‑3.5‑Financial — Production Chat</small></h1>
+  <div id="status">connecting…</div>
+</header>
+
+<main id="messages">
+  <div class="msg bot">
+    <div class="tag">assistant</div>
+    <div class="bubble">Bonjour, je suis l'assistant financier de TechCorp. Posez-moi une question sur la finance, l'investissement ou la stratégie budgétaire.</div>
+  </div>
+</main>
+
+<footer>
+  <form id="form">
+    <input id="input" type="text" placeholder="Écrivez votre question…" autocomplete="off" />
+    <button type="submit" id="send">Envoyer</button>
+  </form>
+  <div id="settings">
+    <label for="endpoint">Endpoint Ollama :</label>
+    <input id="endpoint" type="text" value="http://localhost:11434" />
+    <label for="model">Modèle :</label>
+    <input id="model" type="text" value="phi3.5-financial" />
+  </div>
+</footer>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const form = document.getElementById('form');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const statusEl = document.getElementById('status');
+const endpointInput = document.getElementById('endpoint');
+const modelInput = document.getElementById('model');
+
+let history = [
+  { role: "system", content: "You are a financial assistant specialized in helping financial analysts at TechCorp Industries. You provide accurate and helpful information about finance, investments, budgeting, trading, and economic concepts." }
+];
+
+function addMessage(role, text){
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  div.innerHTML = `<div class="tag">${role === 'user' ? 'vous' : 'assistant'}</div><div class="bubble"></div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div.querySelector('.bubble');
+}
+
+async function checkHealth(){
+  try{
+    const res = await fetch(endpointInput.value.replace(/\/$/,'') + '/api/tags');
+    if(res.ok){
+      statusEl.textContent = 'connecté';
+      statusEl.className = 'ok';
+    } else {
+      throw new Error('bad status');
+    }
+  }catch(e){
+    statusEl.textContent = 'hors ligne';
+    statusEl.className = 'err';
+  }
+}
+checkHealth();
+endpointInput.addEventListener('change', checkHealth);
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if(!text) return;
+
+  addMessage('user', text);
+  history.push({ role: 'user', content: text });
+  input.value = '';
+  sendBtn.disabled = true;
+
+  const bubble = addMessage('bot', '');
+  bubble.textContent = '';
+  const typingMarker = document.createElement('span');
+  typingMarker.className = 'typing';
+  typingMarker.textContent = '…';
+  bubble.appendChild(typingMarker);
+
+  try {
+    const res = await fetch(endpointInput.value.replace(/\/$/,'') + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: modelInput.value,
+        messages: history,
+        stream: true
+      })
+    });
+
+    if(!res.ok || !res.body){
+      throw new Error('Réponse serveur invalide (' + res.status + ')');
+    }
+
+    typingMarker.remove();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    let buffer = '';
+
+    while(true){
+      const { done, value } = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for(const line of lines){
+        if(!line.trim()) continue;
+        try{
+          const json = JSON.parse(line);
+          if(json.message && json.message.content){
+            full += json.message.content;
+            bubble.textContent = full;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        }catch(err){ /* ignore partial JSON */ }
+      }
+    }
+
+    history.push({ role: 'assistant', content: full });
+  } catch(err){
+    bubble.textContent = '⚠️ Impossible de contacter le serveur d\'inférence : ' + err.message;
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+});
+</script>
+
+</body>
+</html>
